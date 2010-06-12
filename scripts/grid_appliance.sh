@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 ### BEGIN INIT INFO
@@ -85,6 +86,12 @@ function start() {
       start
       return
     fi
+    
+    nimbus
+    if [[ $? == 0 ]]; then
+      start
+      return
+    fi
 
     echo "No floppy.img, add a floppy.img and then restart grid_appliance."
     echo "/etc/init.d/grid_appliance.sh start"
@@ -134,13 +141,36 @@ function start() {
 
 function ec2() {
   # Get the floppy image and prepare the system for its use
-  wget http://169.254.169.254/latest/user-data -O /tmp/floppy.zip
+  wget --tries=2 http://169.254.169.254/latest/user-data -O /tmp/floppy.zip
   if [[ $? != 0 ]]; then
     return 1
   fi
 
   cd /tmp
   unzip floppy.zip &> /dev/null
+  mv -f floppy.img $DIR/etc/floppy.img &> /dev/null
+
+  # If the floppy exists, we've done well!
+  if test -e $DIR/etc/floppy.img; then
+    return 0
+  fi
+
+  return 1
+}
+
+function nimbus() {
+  # Get the floppy image and prepare the system for its use
+  sleep 5
+  user_uri="`cat /var/nimbus-metadata-server-url`/2007-01-19/user-data"
+  wget --tries=2 $user_uri -O /tmp/floppy.zip.b64
+  openssl enc -d -base64 -in /tmp/floppy.zip.b64 -out /tmp/floppy.zip
+
+  cd /tmp
+  unzip floppy.zip &> /dev/null
+  if [[ $? != 0 ]]; then
+    return 1
+  fi
+
   mv -f floppy.img $DIR/etc/floppy.img &> /dev/null
 
   # If the floppy exists, we've done well!

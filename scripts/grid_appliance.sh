@@ -34,7 +34,7 @@ function stop() {
   firewall_stop
 
   # Kill the monitor program
-  pkill -KILL monitor.sh 
+  pkill -KILL monitor.sh
 
   # Umount the floppy
   cat /proc/mounts | grep $CONFIG_PATH > /dev/null
@@ -86,7 +86,7 @@ function start() {
       start
       return
     fi
-    
+
     nimbus
     if [[ $? == 0 ]]; then
       start
@@ -160,7 +160,11 @@ function ec2() {
 
 function nimbus() {
   # Get the floppy image and prepare the system for its use
-  sleep 5
+  wait_for_net
+  if [[ $? != 0 ]]; then
+    return 1
+  fi
+
   user_uri="`cat /var/nimbus-metadata-server-url`/2007-01-19/user-data"
   wget --tries=2 $user_uri -O /tmp/floppy.zip.b64
   openssl enc -d -base64 -in /tmp/floppy.zip.b64 -out /tmp/floppy.zip
@@ -177,6 +181,22 @@ function nimbus() {
   if test -e $DIR/etc/floppy.img; then
     return 0
   fi
+
+  return 1
+}
+
+function wait_for_net() {
+  MAX_ATTEMPT=20
+  count=0
+  while [ "$count" -lt "$MAX_ATTEMPT" ]
+    do
+      addr=`ifconfig eth0| grep "inet addr"|awk {'print $2'}|awk -F":" {'print $2'}`
+      if [ "$addr" ]; then
+        return 0
+      fi
+      sleep 0.5
+      let count=count+1 
+    done
 
   return 1
 }
